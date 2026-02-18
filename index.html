@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CertPath v2 — Cert Path Planner & Recert Optimizer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080a0d;
+  --surface: #0e1117;
+  --surface2: #141820;
+  --surface3: #1a1f2a;
+  --border: #1c2231;
+  --border2: #232d3f;
+  --accent: #00c8f0;
+  --accent-dim: #00c8f018;
+  --accent-border: #00c8f030;
+  --green: #00e676;
+  --green-dim: #00e67612;
+  --yellow: #ffc400;
+  --yellow-dim: #ffc40012;
+  --red: #ff4d4d;
+  --red-dim: #ff4d4d12;
+  --purple: #b388ff;
+  --purple-dim: #b388ff12;
+  --orange: #ff9800;
+  --orange-dim: #ff980012;
+  --text: #dde4f0;
+  --text2: #7a8fa8;
+  --text3: #3d4f63;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5}
+#root{height:100%;display:flex;flex-direction:column}
+
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:24px;padding:0 24px;height:50px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--accent);letter-spacing:-0.5px;white-space:nowrap}
+.logo em{color:var(--text3);font-style:normal;font-weight:300}
+.tabs{display:flex;gap:1px;flex:1}
+.tab{padding:6px 14px;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text3);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all 0.15s;letter-spacing:0.5px;white-space:nowrap}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.topbar-stat{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap}
+
+.main{flex:1;overflow-y:auto;padding:20px 24px}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;font-family:var(--mono);font-size:11px;font-weight:600;border-radius:4px;cursor:pointer;transition:all 0.15s;border:none;letter-spacing:0.3px;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:#1ad4ff}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--text3)}
+.btn-danger{background:transparent;color:var(--red);border:1px solid var(--red-dim)}
+.btn-danger:hover{background:var(--red-dim)}
+.btn-purple{background:var(--purple-dim);color:var(--purple);border:1px solid #b388ff30}
+.btn-purple:hover{background:#b388ff22}
+.btn-sm{padding:4px 9px;font-size:10px}
+.btn-xs{padding:2px 7px;font-size:10px}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px}
+
+.cert-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.cert-card{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:14px;position:relative;overflow:hidden;cursor:pointer;transition:border-color 0.15s}
+.cert-card:hover{border-color:var(--border2)}
+.cert-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.cert-card.s-current::after{background:var(--green)}
+.cert-card.s-expiring::after{background:var(--yellow)}
+.cert-card.s-expired::after{background:var(--red)}
+.cert-card.s-unknown::after{background:var(--text3)}
+.cert-card.s-target::after{background:var(--purple)}
+.cert-card.s-planned::after{background:var(--orange)}
+
+.badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:3px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:0.5px}
+.badge-green{background:var(--green-dim);color:var(--green)}
+.badge-yellow{background:var(--yellow-dim);color:var(--yellow)}
+.badge-red{background:var(--red-dim);color:var(--red)}
+.badge-grey{background:#ffffff0a;color:var(--text3)}
+.badge-purple{background:var(--purple-dim);color:var(--purple)}
+.badge-orange{background:var(--orange-dim);color:var(--orange)}
+.badge-accent{background:var(--accent-dim);color:var(--accent)}
+
+.modal-overlay{position:fixed;inset:0;background:#000000d0;z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:24px;width:540px;max-width:96vw;max-height:88vh;overflow-y:auto}
+.modal-title{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);margin-bottom:18px;letter-spacing:-0.3px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+
+.form-group{margin-bottom:13px}
+.form-label{display:block;font-family:var(--mono);font-size:10px;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px}
+.form-input{width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color 0.15s}
+.form-input:focus{border-color:var(--accent)}
+.form-select{width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;cursor:pointer;appearance:none}
+.form-select:focus{border-color:var(--accent)}
+.form-textarea{width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;resize:vertical;min-height:60px;line-height:1.5}
+.form-textarea:focus{border-color:var(--accent)}
+.checkbox-row{display:flex;align-items:center;gap:8px;cursor:pointer}
+.checkbox-row input{accent-color:var(--accent);width:14px;height:14px}
+
+.banner{border-radius:5px;padding:10px 14px;font-size:12px;line-height:1.6;margin-bottom:14px}
+.banner-info{background:var(--accent-dim);border:1px solid var(--accent-border);color:var(--text2)}
+.banner-warn{background:var(--yellow-dim);border:1px solid #ffc40028;color:var(--yellow)}
+.banner-ok{background:var(--green-dim);border:1px solid #00e67628;color:var(--green)}
+.banner-purple{background:var(--purple-dim);border:1px solid #b388ff28;color:var(--purple)}
+
+.opt-step{display:flex;gap:14px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:8px}
+.opt-step-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--mono);font-size:11px;font-weight:700}
+.opt-step-num.ce{background:var(--accent);color:#000}
+.opt-step-num.exam{background:var(--purple);color:#000}
+.opt-step-num.newcert{background:var(--orange);color:#000}
+.opt-step-num.free{background:var(--green);color:#000}
+.opt-step-body{flex:1;min-width:0}
+.opt-step-title{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px}
+.opt-step-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:6px}
+.opt-step-footer{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.cost-pill{font-family:var(--mono);font-size:12px;font-weight:600}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-family:var(--mono);font-size:9px;font-weight:600;margin:2px;letter-spacing:0.3px}
+.tag-accent{background:var(--accent-dim);border:1px solid var(--accent-border);color:var(--accent)}
+.tag-purple{background:var(--purple-dim);border:1px solid #b388ff30;color:var(--purple)}
+.tag-orange{background:var(--orange-dim);border:1px solid #ff980030;color:var(--orange)}
+.tag-green{background:var(--green-dim);border:1px solid #00e67630;color:var(--green)}
+.tag-grey{background:#ffffff08;border:1px solid var(--border2);color:var(--text3)}
+
+.summary-bar{display:flex;gap:0;background:var(--surface2);border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:16px}
+.summary-cell{flex:1;padding:14px 16px;border-right:1px solid var(--border);text-align:center}
+.summary-cell:last-child{border-right:none}
+.summary-val{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1}
+.summary-lbl{font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-top:3px}
+
+.timeline-row{display:grid;grid-template-columns:180px 1fr 70px;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
+.timeline-bar-wrap{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;position:relative}
+.timeline-bar{position:absolute;left:0;top:0;height:100%;border-radius:3px;transition:width 0.3s}
+
+.roadmap-node{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);margin-bottom:8px;position:relative}
+.roadmap-line{position:absolute;left:25px;bottom:-8px;width:1px;height:8px;background:var(--border2)}
+.roadmap-node:last-child .roadmap-line{display:none}
+.roadmap-icon{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;font-weight:700;font-family:var(--mono)}
+
+.cross-row{display:grid;grid-template-columns:1fr 32px 1fr 80px;align-items:center;gap:8px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;margin-bottom:6px;font-size:11px;font-family:var(--mono)}
+.arrow{color:var(--accent);font-size:14px;text-align:center}
+
+.empty{text-align:center;padding:50px 20px;color:var(--text3)}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:0.6}
+.empty-text{font-family:var(--mono);font-size:12px;line-height:1.7}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.mt12{margin-top:12px}
+.mt16{margin-top:16px}
+.mb8{margin-bottom:8px}
+.flex{display:flex}.items-center{align-items:center}.gap8{gap:8px}.gap12{gap:12px}
+.mono{font-family:var(--mono)}.sm{font-size:12px}.xs{font-size:11px}.xxs{font-size:10px}
+.muted{color:var(--text2)}.dim{color:var(--text3)}.accent{color:var(--accent)}.green{color:var(--green)}.yellow{color:var(--yellow)}.red{color:var(--red)}.purple{color:var(--purple)}.orange{color:var(--orange)}
+.w100{width:100%}
+
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+.search-input{width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;margin-bottom:12px}
+.search-input:focus{border-color:var(--accent)}
+
+.target-card{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:12px 14px;cursor:pointer;transition:border-color 0.15s;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.target-card:hover{border-color:var(--border2)}
+.target-card.selected{border-color:var(--purple);background:var(--purple-dim)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+// ─────────────────────────────────────────────────────────────
+// CERT DATABASE
+// ─────────────────────────────────────────────────────────────
+const CERT_DB = [
+  // CompTIA
+  { id:'comptia-aplus',     body:'CompTIA', tier:'core',     name:'A+',           cycleYears:3, examCost:253,  cePools:['comptia-core'],                      ceRequired:20, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'comptia-netplus',   body:'CompTIA', tier:'core',     name:'Network+',     cycleYears:3, examCost:358,  cePools:['comptia-core','comptia-net'],         ceRequired:30, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'comptia-secplus',   body:'CompTIA', tier:'core',     name:'Security+',    cycleYears:3, examCost:392,  cePools:['comptia-core','comptia-sec'],         ceRequired:50, examOnly:false, noExpiry:false, prereqs:[], satisfies:['comptia-aplus','comptia-netplus'] },
+  { id:'comptia-linux',     body:'CompTIA', tier:'core',     name:'Linux+',       cycleYears:3, examCost:358,  cePools:['comptia-core','comptia-net'],         ceRequired:30, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'comptia-cloud',     body:'CompTIA', tier:'core',     name:'Cloud+',       cycleYears:3, examCost:358,  cePools:['comptia-core','comptia-net'],         ceRequired:30, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'comptia-data',      body:'CompTIA', tier:'core',     name:'Data+',        cycleYears:3, examCost:358,  cePools:['comptia-core'],                      ceRequired:30, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'comptia-cysa',      body:'CompTIA', tier:'advanced', name:'CySA+',        cycleYears:3, examCost:392,  cePools:['comptia-sec','comptia-advanced'],    ceRequired:60, examOnly:false, noExpiry:false, prereqs:['comptia-secplus'], satisfies:['comptia-secplus'] },
+  { id:'comptia-pentest',   body:'CompTIA', tier:'advanced', name:'PenTest+',     cycleYears:3, examCost:392,  cePools:['comptia-sec','comptia-advanced'],    ceRequired:60, examOnly:false, noExpiry:false, prereqs:['comptia-secplus'], satisfies:['comptia-secplus'] },
+  { id:'comptia-casp',      body:'CompTIA', tier:'expert',   name:'CASP+',        cycleYears:3, examCost:494,  cePools:['comptia-advanced'],                  ceRequired:75, examOnly:false, noExpiry:false, prereqs:['comptia-secplus'], satisfies:['comptia-secplus','comptia-cysa','comptia-pentest'] },
+  // ISC2
+  { id:'isc2-cc',           body:'ISC²',    tier:'entry',    name:'CC',           cycleYears:3, examCost:0,    cePools:['isc2-cpe'],                          ceRequired:45, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'isc2-sscp',         body:'ISC²',    tier:'associate',name:'SSCP',         cycleYears:3, examCost:249,  cePools:['isc2-cpe'],                          ceRequired:60, examOnly:false, noExpiry:false, prereqs:[], satisfies:['isc2-cc'] },
+  { id:'isc2-cissp',        body:'ISC²',    tier:'expert',   name:'CISSP',        cycleYears:3, examCost:749,  cePools:['isc2-cpe'],                          ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:['isc2-sscp','isc2-cc'], annualFee:125 },
+  { id:'isc2-ccsp',         body:'ISC²',    tier:'advanced', name:'CCSP',         cycleYears:3, examCost:599,  cePools:['isc2-cpe'],                          ceRequired:90, examOnly:false, noExpiry:false, prereqs:['isc2-sscp'], satisfies:['isc2-sscp','isc2-cc'] },
+  { id:'isc2-csslp',        body:'ISC²',    tier:'advanced', name:'CSSLP',        cycleYears:3, examCost:599,  cePools:['isc2-cpe'],                          ceRequired:90, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'isc2-cgrc',         body:'ISC²',    tier:'advanced', name:'CGRC',         cycleYears:3, examCost:599,  cePools:['isc2-cpe'],                          ceRequired:60, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  // ISACA
+  { id:'isaca-cisa',        body:'ISACA',   tier:'expert',   name:'CISA',         cycleYears:3, examCost:575,  cePools:['isaca-cpe'],                         ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:[], annualFee:85 },
+  { id:'isaca-cism',        body:'ISACA',   tier:'expert',   name:'CISM',         cycleYears:3, examCost:575,  cePools:['isaca-cpe'],                         ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:[], annualFee:85 },
+  { id:'isaca-crisc',       body:'ISACA',   tier:'expert',   name:'CRISC',        cycleYears:3, examCost:575,  cePools:['isaca-cpe'],                         ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:[], annualFee:85 },
+  { id:'isaca-cgeit',       body:'ISACA',   tier:'expert',   name:'CGEIT',        cycleYears:3, examCost:575,  cePools:['isaca-cpe'],                         ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'isaca-cdpse',       body:'ISACA',   tier:'advanced', name:'CDPSE',        cycleYears:3, examCost:575,  cePools:['isaca-cpe'],                         ceRequired:60, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  // EC-Council
+  { id:'ec-ceh',            body:'EC-Council',tier:'core',   name:'CEH',          cycleYears:3, examCost:550,  cePools:['ec-ece'],                            ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'ec-cpent',          body:'EC-Council',tier:'advanced',name:'CPENT',       cycleYears:3, examCost:999,  cePools:['ec-ece'],                            ceRequired:120,examOnly:false, noExpiry:false, prereqs:['ec-ceh'], satisfies:['ec-ceh'] },
+  { id:'ec-chfi',           body:'EC-Council',tier:'advanced',name:'CHFI',        cycleYears:3, examCost:550,  cePools:['ec-ece'],                            ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'ec-ecsa',           body:'EC-Council',tier:'advanced',name:'ECSA',        cycleYears:3, examCost:550,  cePools:['ec-ece'],                            ceRequired:120,examOnly:false, noExpiry:false, prereqs:['ec-ceh'], satisfies:['ec-ceh'] },
+  { id:'ec-ctia',           body:'EC-Council',tier:'advanced',name:'CTIA',        cycleYears:3, examCost:450,  cePools:['ec-ece'],                            ceRequired:120,examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  // GIAC
+  { id:'giac-gsec',         body:'GIAC',    tier:'core',     name:'GSEC',         cycleYears:4, examCost:849,  cePools:['giac-cpe'],                          ceRequired:36, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'giac-gcih',         body:'GIAC',    tier:'advanced', name:'GCIH',         cycleYears:4, examCost:849,  cePools:['giac-cpe'],                          ceRequired:36, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'giac-gpen',         body:'GIAC',    tier:'advanced', name:'GPEN',         cycleYears:4, examCost:849,  cePools:['giac-cpe'],                          ceRequired:36, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'giac-gwapt',        body:'GIAC',    tier:'advanced', name:'GWAPT',        cycleYears:4, examCost:849,  cePools:['giac-cpe'],                          ceRequired:36, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'giac-gcia',         body:'GIAC',    tier:'advanced', name:'GCIA',         cycleYears:4, examCost:849,  cePools:['giac-cpe'],                          ceRequired:36, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'giac-gcfe',         body:'GIAC',    tier:'advanced', name:'GCFE',         cycleYears:4, examCost:849,  cePools:['giac-cpe'],                          ceRequired:36, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  { id:'giac-gfact',        body:'GIAC',    tier:'entry',    name:'GFACT',        cycleYears:4, examCost:349,  cePools:['giac-cpe'],                          ceRequired:36, examOnly:false, noExpiry:false, prereqs:[], satisfies:[] },
+  // AWS
+  { id:'aws-cp',            body:'AWS',     tier:'foundational',name:'Cloud Practitioner',     cycleYears:3,examCost:100, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'aws-saa',           body:'AWS',     tier:'associate', name:'Solutions Architect Assoc',cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:[],satisfies:['aws-cp'] },
+  { id:'aws-dev',           body:'AWS',     tier:'associate', name:'Developer Associate',      cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:[],satisfies:['aws-cp'] },
+  { id:'aws-sysops',        body:'AWS',     tier:'associate', name:'SysOps Administrator',     cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:[],satisfies:['aws-cp'] },
+  { id:'aws-saap',          body:'AWS',     tier:'professional',name:'Solutions Architect Pro',cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:['aws-saa'],satisfies:['aws-saa','aws-cp'] },
+  { id:'aws-dop',           body:'AWS',     tier:'professional',name:'DevOps Engineer Pro',    cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:['aws-dev','aws-sysops'],satisfies:['aws-dev','aws-sysops','aws-cp'] },
+  { id:'aws-sec',           body:'AWS',     tier:'specialty', name:'Security Specialty',       cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'aws-ml',            body:'AWS',     tier:'specialty', name:'ML Specialty',             cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'aws-adv-net',       body:'AWS',     tier:'specialty', name:'Advanced Networking',      cycleYears:3,examCost:300, cePools:[],ceRequired:0,examOnly:true, noExpiry:false,prereqs:[],satisfies:[] },
+  // Azure
+  { id:'az-900',            body:'Microsoft',tier:'foundational',name:'AZ-900 Azure Fundamentals',   cycleYears:999,examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:true, prereqs:[],satisfies:[] },
+  { id:'az-104',            body:'Microsoft',tier:'associate', name:'AZ-104 Azure Administrator',    cycleYears:1,  examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:['az-900'] },
+  { id:'az-204',            body:'Microsoft',tier:'associate', name:'AZ-204 Azure Developer',        cycleYears:1,  examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:['az-900'] },
+  { id:'sc-200',            body:'Microsoft',tier:'associate', name:'SC-200 Security Operations',    cycleYears:1,  examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'sc-300',            body:'Microsoft',tier:'associate', name:'SC-300 Identity & Access',      cycleYears:1,  examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'sc-900',            body:'Microsoft',tier:'foundational',name:'SC-900 Security Fundamentals',cycleYears:999,examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:true, prereqs:[],satisfies:[] },
+  { id:'az-500',            body:'Microsoft',tier:'associate', name:'AZ-500 Azure Security',         cycleYears:1,  examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:['sc-200'] },
+  { id:'az-305',            body:'Microsoft',tier:'expert',    name:'AZ-305 Azure Solutions Architect',cycleYears:1,examCost:165,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:['az-104'],satisfies:['az-104'] },
+  // GCP
+  { id:'gcp-ace',           body:'Google Cloud',tier:'associate',name:'Associate Cloud Engineer',           cycleYears:2,examCost:200,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'gcp-pca',           body:'Google Cloud',tier:'professional',name:'Professional Cloud Architect',    cycleYears:2,examCost:200,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:['gcp-ace'],satisfies:['gcp-ace'] },
+  { id:'gcp-sec',           body:'Google Cloud',tier:'professional',name:'Professional Cloud Security Engr',cycleYears:2,examCost:200,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'gcp-de',            body:'Google Cloud',tier:'professional',name:'Professional Data Engineer',      cycleYears:2,examCost:200,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'gcp-devops',        body:'Google Cloud',tier:'professional',name:'Professional DevOps Engineer',    cycleYears:2,examCost:200,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  // OffSec
+  { id:'offsec-oscp',       body:'OffSec',  tier:'advanced', name:'OSCP',         cycleYears:999,examCost:1499,cePools:[],ceRequired:0,examOnly:false,noExpiry:true, prereqs:[],satisfies:[] },
+  { id:'offsec-osep',       body:'OffSec',  tier:'expert',   name:'OSEP',         cycleYears:999,examCost:1499,cePools:[],ceRequired:0,examOnly:false,noExpiry:true, prereqs:['offsec-oscp'],satisfies:['offsec-oscp'] },
+  { id:'offsec-oswp',       body:'OffSec',  tier:'advanced', name:'OSWP',         cycleYears:999,examCost:999, cePools:[],ceRequired:0,examOnly:false,noExpiry:true, prereqs:[],satisfies:[] },
+  { id:'offsec-osed',       body:'OffSec',  tier:'expert',   name:'OSED',         cycleYears:999,examCost:1499,cePools:[],ceRequired:0,examOnly:false,noExpiry:true, prereqs:['offsec-oscp'],satisfies:['offsec-oscp'] },
+  // Cisco
+  { id:'cisco-ccna',        body:'Cisco',   tier:'associate', name:'CCNA',         cycleYears:3,examCost:330, cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'cisco-ccnp-ent',    body:'Cisco',   tier:'professional',name:'CCNP Enterprise',cycleYears:3,examCost:750,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:['cisco-ccna'],satisfies:['cisco-ccna'] },
+  { id:'cisco-ccnp-sec',    body:'Cisco',   tier:'professional',name:'CCNP Security', cycleYears:3,examCost:750,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:['cisco-ccna'],satisfies:['cisco-ccna'] },
+  { id:'cisco-ccie',        body:'Cisco',   tier:'expert',   name:'CCIE',         cycleYears:3,examCost:1600,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:['cisco-ccnp-ent'],satisfies:['cisco-ccnp-ent','cisco-ccnp-sec','cisco-ccna'] },
+  { id:'cisco-devnet-assoc',body:'Cisco',   tier:'associate', name:'DevNet Associate',cycleYears:3,examCost:330,cePools:[],ceRequired:0,examOnly:true,noExpiry:false,prereqs:[],satisfies:[] },
+  // PMI
+  { id:'pmi-pmp',           body:'PMI',     tier:'advanced', name:'PMP',          cycleYears:3,examCost:555, cePools:['pmi-pdu'],ceRequired:60, examOnly:false,noExpiry:false,prereqs:[],satisfies:[], annualFee:60 },
+  { id:'pmi-capm',          body:'PMI',     tier:'entry',    name:'CAPM',         cycleYears:5,examCost:300, cePools:[],ceRequired:0,  examOnly:true, noExpiry:false,prereqs:[],satisfies:[] },
+  { id:'pmi-acp',           body:'PMI',     tier:'advanced', name:'PMI-ACP',      cycleYears:3,examCost:495, cePools:['pmi-pdu'],ceRequired:30, examOnly:false,noExpiry:false,prereqs:[],satisfies:[] },
+  // ITIL
+  { id:'itil4-foundation',  body:'ITIL',    tier:'foundational',name:'ITIL 4 Foundation',cycleYears:999,examCost:385,cePools:[],ceRequired:0,examOnly:false,noExpiry:true,prereqs:[],satisfies:[] },
+  { id:'itil4-practitioner',body:'ITIL',    tier:'advanced', name:'ITIL 4 Practitioner',cycleYears:3,  examCost:550,cePools:[],ceRequired:0,examOnly:false,noExpiry:false,prereqs:['itil4-foundation'],satisfies:['itil4-foundation'] },
+  // eJPT / INE
+  { id:'ine-ejpt',          body:'INE',     tier:'entry',    name:'eJPT',         cycleYears:999,examCost:200, cePools:[],ceRequired:0,examOnly:false,noExpiry:true, prereqs:[],satisfies:[] },
+  { id:'ine-emapt',         body:'INE',     tier:'advanced', name:'eMAPT',        cycleYears:999,examCost:400, cePools:[],ceRequired:0,examOnly:false,noExpiry:true, prereqs:['ine-ejpt'],satisfies:['ine-ejpt'] },
+  // DoD 8570
+  { id:'dod-iat1',          body:'DoD 8570',tier:'baseline', name:'IAT Level I Baseline',  cycleYears:999,examCost:0,cePools:[],ceRequired:0,examOnly:false,noExpiry:true,prereqs:[],satisfies:[],virtual:true },
+  { id:'dod-iat2',          body:'DoD 8570',tier:'baseline', name:'IAT Level II Baseline', cycleYears:999,examCost:0,cePools:[],ceRequired:0,examOnly:false,noExpiry:true,prereqs:[],satisfies:[],virtual:true },
+  { id:'dod-iat3',          body:'DoD 8570',tier:'baseline', name:'IAT Level III Baseline',cycleYears:999,examCost:0,cePools:[],ceRequired:0,examOnly:false,noExpiry:true,prereqs:[],satisfies:[],virtual:true },
+];
+
+// ─────────────────────────────────────────────────────────────
+// CROSS-VENDOR CE GRANT POLICIES (real, documented policies)
+// ─────────────────────────────────────────────────────────────
+// trigger: having/earning this cert grants CE credits INTO foreign pools
+const CROSS_GRANTS = [
+  // CISSP → CompTIA: CISSP satisfies CompTIA CASP+ renewal entirely
+  { trigger:'isc2-cissp',   condition:'hold', grantsTo:'comptia-advanced', credits:75,  note:'CISSP satisfies CompTIA advanced CE requirement per CompTIA CE policy' },
+  { trigger:'isc2-cissp',   condition:'hold', grantsTo:'comptia-sec',      credits:50,  note:'CISSP holder can use towards Security+ CE' },
+  // CISSP → ISACA: documented ISC²/ISACA reciprocity
+  { trigger:'isc2-cissp',   condition:'hold', grantsTo:'isaca-cpe',        credits:40,  note:'ISC²/ISACA reciprocal CPE agreement — annual' },
+  // ISACA → ISC²: reciprocal
+  { trigger:'isaca-cism',   condition:'hold', grantsTo:'isc2-cpe',         credits:30,  note:'ISACA/ISC² reciprocal CPE agreement' },
+  { trigger:'isaca-cisa',   condition:'hold', grantsTo:'isc2-cpe',         credits:30,  note:'ISACA/ISC² reciprocal CPE agreement' },
+  { trigger:'isaca-crisc',  condition:'hold', grantsTo:'isc2-cpe',         credits:30,  note:'ISACA/ISC² reciprocal CPE agreement' },
+  // AWS exams → CompTIA CE credits (CompTIA policy: vendor exams earn CE)
+  { trigger:'aws-sec',      condition:'earn', grantsTo:'comptia-sec',      credits:30,  note:'CompTIA CE policy: passing vendor security exam earns CE credits' },
+  { trigger:'aws-sec',      condition:'earn', grantsTo:'comptia-advanced',  credits:30,  note:'CompTIA CE policy' },
+  { trigger:'aws-saa',      condition:'earn', grantsTo:'comptia-net',      credits:20,  note:'CompTIA CE policy: vendor cloud exam' },
+  { trigger:'aws-saap',     condition:'earn', grantsTo:'comptia-advanced',  credits:30,  note:'CompTIA CE policy: professional level vendor exam' },
+  // Azure exams → CompTIA CE
+  { trigger:'sc-200',       condition:'earn', grantsTo:'comptia-sec',      credits:30,  note:'CompTIA CE: SC-200 maps to security domain' },
+  { trigger:'az-500',       condition:'earn', grantsTo:'comptia-sec',      credits:30,  note:'CompTIA CE: AZ-500 maps to security domain' },
+  { trigger:'az-104',       condition:'earn', grantsTo:'comptia-net',      credits:20,  note:'CompTIA CE: AZ-104 maps to network/systems domain' },
+  // Cisco → CompTIA
+  { trigger:'cisco-ccna',   condition:'earn', grantsTo:'comptia-net',      credits:30,  note:'CompTIA CE: CCNA earns Network+ CE credits' },
+  { trigger:'cisco-ccnp-sec',condition:'earn',grantsTo:'comptia-advanced', credits:40,  note:'CompTIA CE: CCNP Security earns CASP+ CE credits' },
+  { trigger:'cisco-ccnp-ent',condition:'earn',grantsTo:'comptia-net',      credits:30,  note:'CompTIA CE: CCNP earns network CE credits' },
+  // OSCP → EC-Council CEH ECE credits (EC-Council policy)
+  { trigger:'offsec-oscp',  condition:'earn', grantsTo:'ec-ece',           credits:40,  note:'EC-Council ECE: OSCP earns ECE credits toward CEH renewal' },
+  { trigger:'giac-gpen',    condition:'earn', grantsTo:'ec-ece',           credits:30,  note:'EC-Council ECE: GPEN earns ECE credits' },
+  { trigger:'comptia-pentest',condition:'earn',grantsTo:'ec-ece',          credits:30,  note:'EC-Council ECE: PenTest+ earns ECE credits' },
+  // GIAC → ISC² (SANS training = CPE)
+  { trigger:'giac-gsec',    condition:'earn', grantsTo:'isc2-cpe',         credits:20,  note:'SANS-based cert earns ISC² CPE' },
+  { trigger:'giac-gcih',    condition:'earn', grantsTo:'isc2-cpe',         credits:20,  note:'SANS-based cert earns ISC² CPE' },
+  { trigger:'giac-gpen',    condition:'earn', grantsTo:'isc2-cpe',         credits:20,  note:'SANS-based cert earns ISC² CPE' },
+  // PMI accepts anything as PDU
+  { trigger:'isc2-cissp',   condition:'earn', grantsTo:'pmi-pdu',          credits:15,  note:'PMI PDU: professional cert exam counts as education PDUs' },
+  { trigger:'isaca-cism',   condition:'earn', grantsTo:'pmi-pdu',          credits:15,  note:'PMI PDU: professional cert exam' },
+  // DoD 8570 virtual mappings — CompTIA Sec+ satisfies IAT II, CISSP satisfies IAT III
+  { trigger:'comptia-secplus',condition:'hold',grantsTo:'dod-iat2-pool',   credits:999, note:'DoD 8570: Security+ satisfies IAT Level II' },
+  { trigger:'isc2-cissp',    condition:'hold',grantsTo:'dod-iat3-pool',    credits:999, note:'DoD 8570: CISSP satisfies IAT Level III' },
+];
+
+// Exam substitutions: passing certX fully satisfies recert requirement for certY
+const EXAM_SUBS = [
+  { examCert:'comptia-cysa',  satisfiesRecertOf:['comptia-secplus'], note:'Higher CompTIA cert renews lower' },
+  { examCert:'comptia-casp',  satisfiesRecertOf:['comptia-secplus','comptia-cysa','comptia-pentest'], note:'CASP+ renews all below it' },
+  { examCert:'isc2-cissp',    satisfiesRecertOf:['isc2-sscp','isc2-cc'], note:'CISSP recert auto-renews SSCP and CC' },
+  { examCert:'isc2-ccsp',     satisfiesRecertOf:['isc2-sscp','isc2-cc'], note:'CCSP recert auto-renews lower ISC² certs' },
+  { examCert:'ec-cpent',      satisfiesRecertOf:['ec-ceh','ec-ecsa'], note:'CPENT renews CEH and ECSA' },
+  { examCert:'cisco-ccie',    satisfiesRecertOf:['cisco-ccnp-ent','cisco-ccnp-sec','cisco-ccna'], note:'CCIE recert renews all Cisco below it' },
+  { examCert:'cisco-ccnp-ent',satisfiesRecertOf:['cisco-ccna'], note:'CCNP recert renews CCNA' },
+  { examCert:'aws-saap',      satisfiesRecertOf:['aws-saa','aws-cp'], note:'Pro cert auto-renews associate and foundational' },
+  { examCert:'aws-dop',       satisfiesRecertOf:['aws-dev','aws-sysops','aws-cp'], note:'DevOps Pro renews associates' },
+  { examCert:'gcp-pca',       satisfiesRecertOf:['gcp-ace'], note:'GCP Professional renews Associate' },
+  { examCert:'offsec-osep',   satisfiesRecertOf:['offsec-oscp'], note:'OSEP renews OSCP' },
+  { examCert:'offsec-osed',   satisfiesRecertOf:['offsec-oscp'], note:'OSED renews OSCP' },
+  { examCert:'itil4-practitioner',satisfiesRecertOf:['itil4-foundation'], note:'Practitioner renews Foundation' },
+];
+
+// ─────────────────────────────────────────────────────────────
+// ACTIVITY CATALOG
+// ─────────────────────────────────────────────────────────────
+const ACTIVITIES = [
+  // FREE
+  { id:'sans-webcast',      name:'SANS Webcast (per event)',         cost:0,   grants:{'giac-cpe':1,'isc2-cpe':1,'isaca-cpe':1,'comptia-sec':1,'comptia-advanced':1,'ec-ece':1},    cat:'free', desc:'Free webcasts, ~1hr each. Attend multiple.' },
+  { id:'nist-webinar',      name:'NIST/CISA Webinar (per event)',    cost:0,   grants:{'isc2-cpe':2,'isaca-cpe':2,'comptia-sec':2},                                                cat:'free', desc:'Government-hosted. Free CPE.' },
+  { id:'bsides',            name:'BSides Conference',                cost:25,  grants:{'isc2-cpe':8,'isaca-cpe':8,'comptia-sec':8,'ec-ece':8,'giac-cpe':8},                        cat:'conf', desc:'Community security conf. Very low cost, high value.' },
+  { id:'blog-writing',      name:'Technical Blog / Article Writing', cost:0,   grants:{'isc2-cpe':10,'isaca-cpe':10,'comptia-sec':10,'giac-cpe':5},                                cat:'free', desc:'Original published work. Self-reported.' },
+  { id:'volunteer',         name:'Chapter Volunteering (annual)',     cost:0,   grants:{'isc2-cpe':20,'isaca-cpe':20},                                                              cat:'free', desc:'ISC²/ISACA chapter service. Excellent free CPE.' },
+  { id:'ctf',               name:'CTF Competition Participation',     cost:0,   grants:{'giac-cpe':8,'comptia-sec':8,'comptia-advanced':8,'ec-ece':8,'isc2-cpe':4},                cat:'free', desc:'Documented CTF. Self-reported to most bodies.' },
+  // LOW COST
+  { id:'thm',               name:'TryHackMe Pro (annual)',           cost:140, grants:{'comptia-core':30,'comptia-sec':50,'ec-ece':40,'giac-cpe':20,'isc2-cpe':20},                cat:'platform', desc:'Guided security rooms. Solid for Security+ and CEH CE.' },
+  { id:'udemy',             name:'Udemy Course Bundle',              cost:30,  grants:{'isc2-cpe':15,'comptia-core':15,'comptia-sec':15,'pmi-pdu':10},                             cat:'platform', desc:'Low cost, moderate CE value.' },
+  { id:'cybrary',           name:'Cybrary (annual)',                 cost:99,  grants:{'isc2-cpe':20,'comptia-core':20,'comptia-sec':20,'ec-ece':20,'pmi-pdu':15},                 cat:'platform', desc:'Security-focused. Good for ISC² CPE.' },
+  // MID COST
+  { id:'linkedin-learning', name:'LinkedIn Learning (annual)',       cost:240, grants:{'isc2-cpe':40,'comptia-core':20,'isaca-cpe':20,'pmi-pdu':20},                              cat:'platform', desc:'Wide coverage. Weaker for advanced security CE.' },
+  { id:'pluralsight',       name:'Pluralsight (annual)',             cost:299, grants:{'isc2-cpe':60,'comptia-core':30,'comptia-sec':50,'isaca-cpe':30,'pmi-pdu':20},              cat:'platform', desc:'Strong cloud/dev/security content volume.' },
+  { id:'comptia-certmaster',name:'CompTIA CertMaster CE (annual)',   cost:299, grants:{'comptia-core':30,'comptia-sec':50,'comptia-net':30,'comptia-advanced':75},                 cat:'platform', desc:'Official CompTIA CE platform. Maximizes CompTIA CE.' },
+  { id:'ec-aspen',          name:'EC-Council Aspen (annual)',        cost:399, grants:{'ec-ece':120},                                                                              cat:'platform', desc:'Official EC-Council ECE platform.' },
+  // HIGH VALUE
+  { id:'oreilly',           name:"O'Reilly Learning (annual)",       cost:499, grants:{'isc2-cpe':50,'comptia-core':40,'comptia-sec':40,'isaca-cpe':40,'giac-cpe':30,'pmi-pdu':30},cat:'platform', desc:'High-quality books+courses. Broad CE coverage.' },
+  { id:'htb-academy',       name:'HackTheBox Academy (annual)',      cost:490, grants:{'comptia-sec':60,'comptia-advanced':75,'ec-ece':60,'giac-cpe':36,'isc2-cpe':30},            cat:'platform', desc:'Practical offensive/defensive. Strong CASP+/CEH CE.' },
+  // CONFERENCES
+  { id:'defcon',            name:'DEF CON Attendance',               cost:440, grants:{'isc2-cpe':24,'isaca-cpe':16,'comptia-sec':24,'comptia-advanced':24,'ec-ece':24,'giac-cpe':24}, cat:'conf', desc:'Premier hacking conf. ~3 days CPE.' },
+  { id:'rsa-conf',          name:'RSA Conference Attendance',        cost:2200,grants:{'isc2-cpe':40,'isaca-cpe':40,'comptia-sec':40,'comptia-advanced':40,'ec-ece':40,'pmi-pdu':20}, cat:'conf', desc:'Major enterprise security conf.' },
+  { id:'sans-course',       name:'SANS Training Course (online)',    cost:5000,grants:{'giac-cpe':40,'isc2-cpe':40,'isaca-cpe':40,'comptia-sec':60,'comptia-advanced':60,'ec-ece':40}, cat:'training', desc:'Includes attempt at associated GIAC exam.' },
+  { id:'isaca-conf',        name:'ISACA Conference',                 cost:1200,grants:{'isaca-cpe':24,'isc2-cpe':16,'pmi-pdu':12},                                                cat:'conf', desc:'ISACA-specific. High CPE value for CISM/CISA/CRISC.' },
+  { id:'pmi-course',        name:'PMI-Aligned PM Course',            cost:200, grants:{'pmi-pdu':40},                                                                             cat:'training', desc:'PMI-specific PDU training.' },
+];
+
+// ─────────────────────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────────────────────
+const getDef = id => CERT_DB.find(d => d.id === id);
+
+function getStatus(uc) {
+  const def = getDef(uc.defId);
+  if (!def) return 'unknown';
+  if (def.noExpiry) return 'current';
+  if (!uc.expiryDate) return 'unknown';
+  const days = getDaysLeft(uc);
+  if (days < 0) return 'expired';
+  if (days < 180) return 'expiring';
+  return 'current';
+}
+
+function getDaysLeft(uc) {
+  if (!uc.expiryDate) return null;
+  return Math.floor((new Date(uc.expiryDate) - new Date()) / 86400000);
+}
+
+function fmtCost(n) {
+  if (n === 0) return 'FREE';
+  return '$' + n.toLocaleString();
+}
+
+// ─────────────────────────────────────────────────────────────
+// OPTIMIZER ENGINE
+// ─────────────────────────────────────────────────────────────
+function buildCrossGrantMap(userCerts) {
+  // Returns map of poolId -> bonus credits from held/earned certs
+  const bonuses = {};
+  for (const uc of userCerts) {
+    for (const xg of CROSS_GRANTS) {
+      if (xg.trigger === uc.defId && xg.condition === 'hold') {
+        bonuses[xg.grantsTo] = (bonuses[xg.grantsTo] || 0) + xg.credits;
+      }
+    }
+  }
+  return bonuses;
+}
+
+function buildExamSubMap() {
+  // certId -> set of certIds whose recert it satisfies
+  const map = {};
+  for (const sub of EXAM_SUBS) {
+    map[sub.examCert] = sub.satisfiesRecertOf;
+  }
+  return map;
+}
+
+function greedyOptimize(userCerts, targetCertIds = [], customGrants = []) {
+  const heldIds = new Set(userCerts.map(uc => uc.defId));
+  const crossBonuses = buildCrossGrantMap(userCerts);
+  const examSubMap = buildExamSubMap();
+
+  // Merge custom grants into activity catalog
+  const allActivities = [...ACTIVITIES];
+  for (const cg of customGrants) {
+    allActivities.push({
+      id: `custom-${cg.id}`,
+      name: cg.name,
+      cost: cg.cost,
+      grants: cg.grants,
+      cat: 'custom',
+      desc: cg.desc || 'User-defined activity',
+    });
+  }
+
+  // ── Determine what needs action ──
+  const needsRecert = userCerts.filter(uc => {
+    const def = getDef(uc.defId);
+    if (!def || def.noExpiry) return false;
+    const s = getStatus(uc);
+    return s === 'expired' || s === 'expiring';
+  });
+
+  const needsAcquisition = targetCertIds.filter(id => !heldIds.has(id));
+
+  // ── Build requirement pools ──
+  const poolRequirements = {}; // poolId -> {certs:[], creditsNeeded}
+  const examOnlyActions = [];
+  const newCertActions = [];
+  const alreadyCoveredBySub = new Set();
+
+  // Check exam subs first — if user holds a higher cert, lower cert may already be covered
+  for (const uc of needsRecert) {
+    for (const [examId, satisfies] of Object.entries(examSubMap)) {
+      if (heldIds.has(examId) && satisfies.includes(uc.defId)) {
+        alreadyCoveredBySub.add(uc.defId);
+      }
+    }
+  }
+
+  for (const uc of needsRecert) {
+    if (alreadyCoveredBySub.has(uc.defId)) continue;
+    const def = getDef(uc.defId);
+    if (!def) continue;
+
+    if (def.examOnly || def.cePools.length === 0) {
+      // Check if any earned cross-sub covers this
+      examOnlyActions.push({ type:'exam', uc, def, cost: def.examCost });
+      continue;
+    }
+
+    const ceEarned = (uc.ceEarned || 0) + (crossBonuses[def.cePools[0]] || 0);
+    const ceNeeded = Math.max(0, def.ceRequired - ceEarned);
+    if (ceNeeded > 0) {
+      for (const pool of def.cePools) {
+        if (!poolRequirements[pool]) poolRequirements[pool] = { certs:[], creditsNeeded:0 };
+        poolRequirements[pool].certs.push(uc.defId);
+        poolRequirements[pool].creditsNeeded = Math.max(poolRequirements[pool].creditsNeeded, ceNeeded);
+      }
+    }
+  }
+
+  // New cert acquisitions
+  for (const targetId of needsAcquisition) {
+    const def = getDef(targetId);
+    if (!def) continue;
+    // Prereqs check
+    const unmetPrereqs = (def.prereqs || []).filter(p => !heldIds.has(p));
+    newCertActions.push({
+      type: 'newcert',
+      def,
+      cost: def.examCost,
+      unmetPrereqs,
+      crossGrantsOnEarn: CROSS_GRANTS.filter(xg => xg.trigger === targetId && xg.condition === 'earn'),
+      satisfies: def.satisfies || [],
+      examSubs: examSubMap[targetId] || [],
+    });
+  }
+
+  // ── Greedy CE cover pass ──
+  const remaining = JSON.parse(JSON.stringify(poolRequirements));
+  const selectedActivities = [];
+  let itr = 0;
+
+  while (Object.values(remaining).some(r => r.creditsNeeded > 0) && itr < 80) {
+    itr++;
+    let best = null, bestScore = -1;
+
+    for (const act of allActivities) {
+      if (selectedActivities.find(s => s.id === act.id)) continue;
+      let coverage = 0;
+      for (const [pool, grants] of Object.entries(act.grants || {})) {
+        if (remaining[pool] && remaining[pool].creditsNeeded > 0) {
+          coverage += Math.min(grants, remaining[pool].creditsNeeded);
+        }
+      }
+      if (coverage === 0) continue;
+      const score = coverage / Math.max(act.cost, 1);
+      if (score > bestScore) { bestScore = score; best = act; }
+    }
+    if (!best) break;
+
+    selectedActivities.push(best);
+    const coveredCerts = new Set();
+    for (const [pool, grants] of Object.entries(best.grants || {})) {
+      if (remaining[pool]) {
+        remaining[pool].creditsNeeded = Math.max(0, remaining[pool].creditsNeeded - grants);
+        if (remaining[pool].creditsNeeded === 0) remaining[pool].certs.forEach(c => coveredCerts.add(c));
+      }
+    }
+  }
+
+  // ── Assemble steps ──
+  const steps = [];
+
+  // Auto-covered by exam subs
+  for (const certId of alreadyCoveredBySub) {
+    const def = getDef(certId);
+    const coveringExam = EXAM_SUBS.find(s => s.satisfiesRecertOf.includes(certId) && heldIds.has(s.examCert));
+    steps.push({
+      type: 'auto',
+      title: `${def.name} — Auto-renewed`,
+      desc: coveringExam ? coveringExam.note : 'Covered by higher-tier cert',
+      cost: 0,
+      coveredCerts: [certId],
+      coveredPools: [],
+    });
+  }
+
+  // CE activities
+  for (const act of selectedActivities) {
+    const coveredPools = Object.keys(act.grants || {}).filter(p => poolRequirements[p]);
+    const coveredCerts = [...new Set(coveredPools.flatMap(p => poolRequirements[p]?.certs || []))];
+    steps.push({
+      type: act.cost === 0 ? 'free' : 'ce',
+      title: act.name,
+      desc: act.desc,
+      cost: act.cost,
+      coveredCerts,
+      coveredPools,
+      grants: act.grants,
+    });
+  }
+
+  // Exam-only retakes
+  for (const ea of examOnlyActions) {
+    steps.push({
+      type: 'exam',
+      title: `${ea.def.name} — Exam Retake`,
+      desc: `${ea.def.body} exam. Exam-only recertification path.`,
+      cost: ea.cost,
+      coveredCerts: [ea.uc.defId],
+      coveredPools: [],
+    });
+  }
+
+  // New cert acquisitions — sort by prereq count (easiest first)
+  newCertActions.sort((a,b) => a.unmetPrereqs.length - b.unmetPrereqs.length);
+  for (const nc of newCertActions) {
+    const crossEffects = nc.crossGrantsOnEarn.map(xg =>
+      `Grants ${xg.credits} CE toward ${xg.grantsTo} (${xg.note})`
+    );
+    const subEffects = nc.examSubs.map(s => getDef(s)?.name).filter(Boolean);
+    steps.push({
+      type: 'newcert',
+      title: `Earn ${nc.def.name} (${nc.def.body})`,
+      desc: `New certification. Exam cost: ${fmtCost(nc.cost)}.${nc.unmetPrereqs.length ? ` Prereqs needed first: ${nc.unmetPrereqs.map(p=>getDef(p)?.name).join(', ')}.` : ''}`,
+      cost: nc.cost,
+      coveredCerts: [],
+      coveredPools: [],
+      crossEffects,
+      subEffects,
+      unmetPrereqs: nc.unmetPrereqs,
+      isTarget: true,
+    });
+  }
+
+  // Sort: auto → free → CE ascending cost → exams → new certs
+  const typeOrder = { auto:0, free:1, ce:2, exam:3, newcert:4 };
+  steps.sort((a,b) => {
+    const to = typeOrder[a.type] - typeOrder[b.type];
+    if (to !== 0) return to;
+    return a.cost - b.cost;
+  });
+
+  const totalCost = steps.reduce((s,st) => s + st.cost, 0);
+  return { steps, totalCost, needsRecert: needsRecert.length, newCerts: needsAcquisition.length };
+}
+
+// ─────────────────────────────────────────────────────────────
+// SHARED COMPONENTS
+// ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }) {
+  const map = {
+    current: ['badge-green','CURRENT'],
+    expiring: ['badge-yellow','EXPIRING'],
+    expired:  ['badge-red','EXPIRED'],
+    unknown:  ['badge-grey','NO DATE'],
+    target:   ['badge-purple','TARGET'],
+    planned:  ['badge-orange','PLANNED'],
+  };
+  const [cls, label] = map[status] || ['badge-grey', status.toUpperCase()];
+  return <span className={`badge ${cls}`}>{label}</span>;
+}
+
+function ProgressBar({ value, max, color }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value/max)*100)) : 0;
+  return (
+    <div style={{height:4,background:'var(--surface2)',borderRadius:2,overflow:'hidden',marginTop:8}}>
+      <div style={{height:'100%',width:`${pct}%`,background:color||'var(--accent)',borderRadius:2,transition:'width 0.3s'}} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADD / EDIT CERT MODAL
+// ─────────────────────────────────────────────────────────────
+function CertModal({ existing, onClose, onSave, onDelete }) {
+  const [defId, setDefId] = useState(existing?.defId || '');
+  const [expiryDate, setExpiryDate] = useState(existing?.expiryDate || '');
+  const [ceEarned, setCeEarned] = useState(existing?.ceEarned || 0);
+  const [notes, setNotes] = useState(existing?.notes || '');
+  const def = getDef(defId);
+  const bodies = [...new Set(CERT_DB.filter(d=>!d.virtual).map(d=>d.body))].sort();
+  const isEdit = !!existing;
+
+  const handleSave = () => {
+    if (!defId) return;
+    const record = { defId, expiryDate, ceEarned: parseInt(ceEarned)||0, notes, id: existing?.id || Date.now().toString() };
+    onSave(record);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-title">{isEdit ? 'EDIT CERTIFICATION' : 'ADD CERTIFICATION'}</div>
+
+        {!isEdit && (
+          <div className="form-group">
+            <label className="form-label">Certification</label>
+            <select className="form-select" value={defId} onChange={e=>setDefId(e.target.value)}>
+              <option value="">— Select —</option>
+              {bodies.map(b=>(
+                <optgroup label={b} key={b}>
+                  {CERT_DB.filter(d=>d.body===b&&!d.virtual).map(d=>(
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {isEdit && (
+          <div className="banner banner-info" style={{marginBottom:14}}>
+            <span className="accent mono sm">{getDef(existing.defId)?.body} {getDef(existing.defId)?.name}</span>
+          </div>
+        )}
+
+        {def && (
+          <div className="banner banner-info" style={{marginBottom:14}}>
+            <span className="accent">{def.body} {def.name}</span> — {def.noExpiry ? 'Does not expire' : `${def.cycleYears}yr cycle`}
+            {def.examOnly ? ' · Exam-only recert' : def.ceRequired > 0 ? ` · ${def.ceRequired} CE credits to recertify` : ''}
+            {def.examCost > 0 ? ` · Exam: ${fmtCost(def.examCost)}` : ''}
+          </div>
+        )}
+
+        {def && !def.noExpiry && (
+          <div className="form-group">
+            <label className="form-label">Expiry Date</label>
+            <input type="date" className="form-input" value={expiryDate} onChange={e=>setExpiryDate(e.target.value)} />
+          </div>
+        )}
+
+        {def && !def.examOnly && def.ceRequired > 0 && (
+          <div className="form-group">
+            <label className="form-label">CE Credits Already Earned (of {def.ceRequired} required)</label>
+            <input type="number" className="form-input" value={ceEarned} onChange={e=>setCeEarned(e.target.value)} min="0" max={def.ceRequired} />
+          </div>
+        )}
+
+        <div className="form-group">
+          <label className="form-label">Notes</label>
+          <input type="text" className="form-input" placeholder="e.g. renewal strategy, priority…" value={notes} onChange={e=>setNotes(e.target.value)} />
+        </div>
+
+        <div className="modal-footer">
+          {isEdit && <button className="btn btn-danger btn-sm" onClick={()=>{onDelete(existing.id);onClose();}}>Delete</button>}
+          <div style={{flex:1}}/>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={!defId}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// CUSTOM GRANT MODAL
+// ─────────────────────────────────────────────────────────────
+function CustomGrantModal({ onClose, onAdd }) {
+  const [name, setName] = useState('');
+  const [cost, setCost] = useState('0');
+  const [desc, setDesc] = useState('');
+  const [rows, setRows] = useState([{ pool:'', credits:'' }]);
+  const pools = [...new Set(CERT_DB.flatMap(d=>d.cePools))].sort();
+
+  const addRow = () => setRows(r=>[...r,{pool:'',credits:''}]);
+  const updateRow = (i,k,v) => setRows(r=>r.map((row,ri)=>ri===i?{...row,[k]:v}:row));
+
+  const handleAdd = () => {
+    const grants = {};
+    for (const row of rows) {
+      if (row.pool && row.credits) grants[row.pool] = parseInt(row.credits)||0;
+    }
+    if (!name || Object.keys(grants).length===0) return;
+    onAdd({ id:Date.now().toString(), name, cost:parseInt(cost)||0, grants, desc });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-title">ADD CUSTOM CE ACTIVITY</div>
+        <div className="banner banner-info">Define employer training, conference, or any activity with specific CE grants not in the catalog.</div>
+        <div className="form-group">
+          <label className="form-label">Activity Name</label>
+          <input className="form-input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Internal Security Training Q1" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Cost ($)</label>
+          <input type="number" className="form-input" value={cost} onChange={e=>setCost(e.target.value)} min="0" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Description</label>
+          <input className="form-input" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Optional notes" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">CE Grants</label>
+          {rows.map((row,i)=>(
+            <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 80px',gap:8,marginBottom:6}}>
+              <select className="form-select" value={row.pool} onChange={e=>updateRow(i,'pool',e.target.value)}>
+                <option value="">— Pool —</option>
+                {pools.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>
+              <input type="number" className="form-input" placeholder="Credits" value={row.credits} onChange={e=>updateRow(i,'credits',e.target.value)} min="1" />
+            </div>
+          ))}
+          <button className="btn btn-ghost btn-sm" onClick={addRow}>+ Add Pool</button>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleAdd}>Add Activity</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────────────────────
+function PortfolioTab({ userCerts, setUserCerts }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editCert, setEditCert] = useState(null);
+  const [filter, setFilter] = useState('all');
+
+  const saveCert = c => setUserCerts(prev => prev.some(u=>u.id===c.id) ? prev.map(u=>u.id===c.id?c:u) : [...prev,c]);
+  const delCert = id => setUserCerts(prev=>prev.filter(u=>u.id!==id));
+
+  const filtered = userCerts.filter(uc => {
+    if (filter==='all') return true;
+    return getStatus(uc) === filter;
+  });
+
+  return (
+    <div>
+      <div className="section-header">
+        <div className="flex gap8 items-center">
+          <span className="section-title">Portfolio ({userCerts.length})</span>
+          <div className="flex gap8">
+            {['all','current','expiring','expired','unknown'].map(f=>(
+              <button key={f} className={`btn btn-xs ${filter===f?'btn-primary':'btn-ghost'}`} onClick={()=>setFilter(f)}>
+                {f.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={()=>setShowAdd(true)}>+ Add Cert</button>
+      </div>
+
+      {filtered.length===0 ? (
+        <div className="empty">
+          <div className="empty-icon">🏅</div>
+          <div className="empty-text">{userCerts.length===0 ? 'No certifications added.\nClick "+ Add Cert" to start.' : 'No certs match this filter.'}</div>
+        </div>
+      ) : (
+        <div className="cert-grid">
+          {filtered.map(uc=>{
+            const def = getDef(uc.defId);
+            if (!def) return null;
+            const status = getStatus(uc);
+            const days = getDaysLeft(uc);
+            const xgrants = CROSS_GRANTS.filter(xg=>xg.trigger===uc.defId);
+            return (
+              <div key={uc.id} className={`cert-card s-${status}`} onClick={()=>setEditCert(uc)}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div>
+                    <div style={{fontFamily:'var(--mono)',fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:2}}>{def.name}</div>
+                    <div style={{fontSize:11,color:'var(--text2)'}}>{def.body} · {def.tier}</div>
+                  </div>
+                  <StatusBadge status={status} />
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                  {!def.noExpiry && uc.expiryDate && (
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:11}}>
+                      <span className="dim mono">EXPIRES</span>
+                      <span className={`mono ${status==='expired'?'red':status==='expiring'?'yellow':'muted'}`}>
+                        {uc.expiryDate} {days!==null&&<span>({days>0?`${days}d`:'PAST'})</span>}
+                      </span>
+                    </div>
+                  )}
+                  {def.noExpiry && <div style={{fontSize:11}}><span className="dim mono">EXPIRY </span><span className="green mono">NONE</span></div>}
+                  {def.ceRequired>0&&!def.examOnly&&(
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:11}}>
+                      <span className="dim mono">CE</span>
+                      <span className="muted mono">{uc.ceEarned||0}/{def.ceRequired}</span>
+                    </div>
+                  )}
+                  {def.examOnly&&<div style={{fontSize:11}}><span className="dim mono">RECERT </span><span className="muted mono">Exam only</span></div>}
+                </div>
+                {def.ceRequired>0&&!def.examOnly&&(
+                  <ProgressBar value={uc.ceEarned||0} max={def.ceRequired} color={getStatus(uc)==='expired'?'var(--red)':'var(--accent)'} />
+                )}
+                {xgrants.length>0&&(
+                  <div style={{marginTop:8,fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)'}}>
+                    ↗ Grants CE to {xgrants.map(x=>x.grantsTo).join(', ')}
+                  </div>
+                )}
+                {uc.notes&&<div style={{marginTop:6,fontSize:11,color:'var(--text3)',fontStyle:'italic'}}>{uc.notes}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showAdd&&<CertModal onClose={()=>setShowAdd(false)} onSave={saveCert} onDelete={delCert}/>}
+      {editCert&&<CertModal existing={editCert} onClose={()=>setEditCert(null)} onSave={saveCert} onDelete={delCert}/>}
+    </div>
+  );
+}
+
+function TimelineTab({ userCerts }) {
+  const withDates = userCerts.filter(uc=>{
+    const def=getDef(uc.defId);
+    return def&&!def.noExpiry&&uc.expiryDate;
+  }).sort((a,b)=>new Date(a.expiryDate)-new Date(b.expiryDate));
+
+  const noExpiry = userCerts.filter(uc=>getDef(uc.defId)?.noExpiry);
+
+  const now=new Date();
+  const maxDate=new Date(now); maxDate.setFullYear(maxDate.getFullYear()+5);
+  const totalMs=maxDate-now;
+
+  if (userCerts.length===0) return <div className="empty"><div className="empty-icon">📅</div><div className="empty-text">No certs in portfolio.</div></div>;
+
+  return (
+    <div>
+      <div className="section-header"><span className="section-title">Expiry Timeline — Next 5 Years</span></div>
+      <div className="card">
+        <div className="flex gap12 mb8" style={{flexWrap:'wrap'}}>
+          {[['var(--green)','Current'],['var(--yellow)','Expiring <6mo'],['var(--red)','Expired']].map(([c,l])=>(
+            <span key={l} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,fontFamily:'var(--mono)',color:'var(--text2)'}}>
+              <span style={{width:8,height:8,borderRadius:2,background:c,display:'inline-block'}}/>
+              {l}
+            </span>
+          ))}
+        </div>
+        {withDates.map(uc=>{
+          const def=getDef(uc.defId);
+          const status=getStatus(uc);
+          const days=getDaysLeft(uc);
+          const exp=new Date(uc.expiryDate);
+          const barW = days>0 ? Math.min(100,((exp-now)/totalMs)*100) : 2;
+          const barColor = status==='expired'?'var(--red)':status==='expiring'?'var(--yellow)':'var(--green)';
+          return (
+            <div key={uc.id} className="timeline-row">
+              <div style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text2)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{def?.name}</div>
+              <div className="timeline-bar-wrap">
+                <div className="timeline-bar" style={{width:`${barW}%`,background:barColor}}/>
+              </div>
+              <div style={{fontFamily:'var(--mono)',fontSize:10,textAlign:'right',color:status==='expired'?'var(--red)':status==='expiring'?'var(--yellow)':'var(--text3)'}}>
+                {days===null?'—':days>0?`${days}d`:'EXPIRED'}
+              </div>
+            </div>
+          );
+        })}
+        {noExpiry.length>0&&(
+          <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+            <div className="section-title" style={{marginBottom:8}}>NON-EXPIRING</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+              {noExpiry.map(uc=><span key={uc.id} className="tag tag-green">{getDef(uc.defId)?.name}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CrossGrantsTab({ userCerts }) {
+  const heldIds = new Set(userCerts.map(u=>u.defId));
+
+  const active = CROSS_GRANTS.filter(xg=>heldIds.has(xg.trigger));
+  const potential = CROSS_GRANTS.filter(xg=>!heldIds.has(xg.trigger));
+
+  return (
+    <div>
+      <div className="section-header"><span className="section-title">Cross-Vendor CE Policies</span></div>
+      <div className="banner banner-info">
+        Cross-body CE grants — holding or earning certain certs deposits CE credits into other vendors' pools automatically. Active grants feed into your optimizer.
+      </div>
+
+      {active.length>0&&(
+        <>
+          <div className="section-title" style={{marginBottom:10}}>ACTIVE — FROM YOUR PORTFOLIO</div>
+          {active.map((xg,i)=>{
+            const triggerDef=getDef(xg.trigger);
+            return (
+              <div key={i} className="cross-row">
+                <span><span className="accent">{triggerDef?.name}</span><br/><span className="dim xxs">{triggerDef?.body}</span></span>
+                <div className="arrow">→</div>
+                <span className="muted">{xg.grantsTo}</span>
+                <span><span className="green">{xg.credits>=999?'Full':xg.credits+' CE'}</span><br/><span className="dim xxs">{xg.condition}</span></span>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {active.length===0&&(
+        <div className="banner banner-warn">No active cross-grants from current portfolio. Add more certs to unlock cross-body CE benefits.</div>
+      )}
+
+      <div style={{marginTop:20}}>
+        <div className="section-title" style={{marginBottom:10}}>ALL DOCUMENTED POLICIES</div>
+        {CROSS_GRANTS.map((xg,i)=>{
+          const triggerDef=getDef(xg.trigger);
+          const isActive=heldIds.has(xg.trigger);
+          return (
+            <div key={i} className="cross-row" style={{opacity:isActive?1:0.45}}>
+              <span><span style={{color:isActive?'var(--accent)':'var(--text2)'}}>{triggerDef?.name}</span><br/><span className="dim xxs">{triggerDef?.body}</span></span>
+              <div className="arrow">→</div>
+              <span className="muted xs">{xg.grantsTo}</span>
+              <span className="mono xs"><span className="green">{xg.credits>=999?'Full':xg.credits+' CE'}</span><br/><span className="dim">{xg.condition}</span></span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{marginTop:20}}>
+        <div className="section-title" style={{marginBottom:10}}>EXAM SUBSTITUTION POLICIES</div>
+        <div className="banner banner-info">Passing or renewing these certs automatically satisfies recertification for lower-tier certs in the same chain.</div>
+        {EXAM_SUBS.map((sub,i)=>{
+          const def=getDef(sub.examCert);
+          const isActive=heldIds.has(sub.examCert);
+          return (
+            <div key={i} className="cross-row" style={{opacity:isActive?1:0.45,gridTemplateColumns:'1fr 32px 1fr 80px'}}>
+              <span><span style={{color:isActive?'var(--purple)':'var(--text2)'}}>{def?.name}</span><br/><span className="dim xxs">{def?.body}</span></span>
+              <div className="arrow" style={{color:'var(--purple)'}}>⟹</div>
+              <span className="muted xs">{sub.satisfiesRecertOf.map(id=>getDef(id)?.name).filter(Boolean).join(', ')}</span>
+              <span className="dim xxs">{sub.note}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RoadmapTab({ userCerts, targetIds, setTargetIds }) {
+  const [search, setSearch] = useState('');
+  const [filterBody, setFilterBody] = useState('All');
+  const heldIds = new Set(userCerts.map(u=>u.defId));
+  const bodies = ['All',...new Set(CERT_DB.filter(d=>!d.virtual).map(d=>d.body)).values()].sort();
+
+  const filtered = CERT_DB.filter(d=>{
+    if (d.virtual) return false;
+    if (heldIds.has(d.id)) return false;
+    if (filterBody!=='All'&&d.body!==filterBody) return false;
+    if (search&&!d.name.toLowerCase().includes(search.toLowerCase())&&!d.body.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const toggleTarget = id => setTargetIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+
+  const tierColors = { foundational:'var(--text3)',entry:'var(--green)',core:'var(--accent)',associate:'var(--accent)',advanced:'var(--yellow)',professional:'var(--yellow)',expert:'var(--red)',specialty:'var(--purple)',expert:'var(--red)',baseline:'var(--text3)' };
+
+  return (
+    <div>
+      <div className="section-header">
+        <span className="section-title">Cert Roadmap — Target Picker</span>
+        <span className="dim mono xxs">{targetIds.length} selected</span>
+      </div>
+      <div className="banner banner-purple">
+        Select certifications you want to earn. The Optimizer will include them in the action plan, accounting for cross-vendor CE effects and exam substitution chains.
+      </div>
+
+      {targetIds.length>0&&(
+        <div style={{marginBottom:14}}>
+          <div className="section-title" style={{marginBottom:8}}>SELECTED TARGETS</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {targetIds.map(id=>{
+              const def=getDef(id);
+              return (
+                <span key={id} className="tag tag-purple" style={{cursor:'pointer',padding:'3px 9px'}} onClick={()=>toggleTarget(id)}>
+                  {def?.name} ✕
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap8" style={{marginBottom:12,flexWrap:'wrap'}}>
+        <input className="search-input" style={{margin:0,flex:1,minWidth:160}} placeholder="Search certs…" value={search} onChange={e=>setSearch(e.target.value)}/>
+        <select className="form-select" style={{width:'auto'}} value={filterBody} onChange={e=>setFilterBody(e.target.value)}>
+          {bodies.map(b=><option key={b}>{b}</option>)}
+        </select>
+      </div>
+
+      <div className="cert-grid">
+        {filtered.map(def=>{
+          const isTgt=targetIds.includes(def.id);
+          const prereqsMet=(def.prereqs||[]).every(p=>heldIds.has(p));
+          return (
+            <div key={def.id} className={`target-card ${isTgt?'selected':''}`} onClick={()=>toggleTarget(def.id)}>
+              <div>
+                <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700,color:'var(--text)',marginBottom:2}}>{def.name}</div>
+                <div style={{fontSize:11,color:'var(--text2)'}}>{def.body}</div>
+                <div style={{fontSize:10,color:tierColors[def.tier]||'var(--text3)',fontFamily:'var(--mono)',marginTop:2}}>{def.tier?.toUpperCase()}</div>
+                {!prereqsMet&&(
+                  <div style={{fontSize:10,color:'var(--yellow)',marginTop:3,fontFamily:'var(--mono)'}}>
+                    Prereqs: {(def.prereqs||[]).filter(p=>!heldIds.has(p)).map(p=>getDef(p)?.name).join(', ')}
+                  </div>
+                )}
+              </div>
+              <div style={{textAlign:'right',flexShrink:0}}>
+                <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--green)',fontWeight:600}}>{fmtCost(def.examCost)}</div>
+                {isTgt&&<span className="badge badge-purple" style={{marginTop:4}}>TARGETED</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {filtered.length===0&&<div className="empty"><div className="empty-icon">🔍</div><div className="empty-text">No matching certs.</div></div>}
+    </div>
+  );
+}
+
+function OptimizerTab({ userCerts, targetIds, customGrants }) {
+  const result = useMemo(()=>greedyOptimize(userCerts, targetIds, customGrants),[userCerts,targetIds,customGrants]);
+
+  if (userCerts.length===0&&targetIds.length===0) {
+    return <div className="empty"><div className="empty-icon">⚙️</div><div className="empty-text">Add certs to your portfolio and/or select targets in the Roadmap tab.</div></div>;
+  }
+
+  const typeLabel = { auto:'AUTO', free:'FREE', ce:'CE', exam:'EXAM', newcert:'NEW' };
+  const typeColor = { auto:'var(--green)', free:'var(--green)', ce:'var(--accent)', exam:'var(--purple)', newcert:'var(--orange)' };
+
+  return (
+    <div>
+      <div className="summary-bar">
+        <div className="summary-cell"><div className="summary-val accent">{fmtCost(result.totalCost)}</div><div className="summary-lbl">Total Cost</div></div>
+        <div className="summary-cell"><div className="summary-val">{result.steps.length}</div><div className="summary-lbl">Actions</div></div>
+        <div className="summary-cell"><div className="summary-val yellow">{result.needsRecert}</div><div className="summary-lbl">Need Recert</div></div>
+        <div className="summary-cell"><div className="summary-val purple">{result.newCerts}</div><div className="summary-lbl">Target Certs</div></div>
+        <div className="summary-cell"><div className="summary-val green">{result.steps.filter(s=>s.cost===0).length}</div><div className="summary-lbl">Free Steps</div></div>
+      </div>
+
+      {result.steps.length===0?(
+        <div className="banner banner-ok">All current certs are valid. No recertification actions needed. Select targets in the Roadmap tab to plan new certs.</div>
+      ):(
+        <>
+          <div className="banner banner-info">
+            Greedy optimizer: free activities first, then cost-efficiency ranked. Cross-vendor CE grants from your portfolio are already factored in. Complete free steps before spending.
+          </div>
+          <div className="section-header"><span className="section-title">Action Plan</span></div>
+          {result.steps.map((step,i)=>(
+            <div key={i} className="opt-step">
+              <div className={`opt-step-num ${step.type}`} style={{background:typeColor[step.type]||'var(--accent)',color:'#000'}}>
+                {typeLabel[step.type]||i+1}
+              </div>
+              <div className="opt-step-body">
+                <div className="opt-step-title">{step.title}</div>
+                <div className="opt-step-desc">{step.desc}</div>
+                {step.crossEffects?.length>0&&(
+                  <div style={{fontSize:11,color:'var(--accent)',marginBottom:4}}>
+                    {step.crossEffects.map((e,j)=><div key={j}>↗ {e}</div>)}
+                  </div>
+                )}
+                {step.subEffects?.length>0&&(
+                  <div style={{fontSize:11,color:'var(--purple)',marginBottom:4}}>
+                    ⟹ Also renews: {step.subEffects.join(', ')}
+                  </div>
+                )}
+                <div className="opt-step-footer">
+                  <span className="cost-pill" style={{color:step.cost===0?'var(--green)':'var(--yellow)'}}>
+                    {fmtCost(step.cost)}
+                  </span>
+                  {step.coveredCerts?.length>0&&step.coveredCerts.map(id=>{
+                    const def=getDef(id);
+                    return <span key={id} className="tag tag-accent">{def?.name||id}</span>;
+                  })}
+                  {step.unmetPrereqs?.length>0&&(
+                    <span style={{fontSize:10,color:'var(--yellow)',fontFamily:'var(--mono)'}}>
+                      ⚠ Prereqs first: {step.unmetPrereqs.map(p=>getDef(p)?.name).join(', ')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function DataTab({ userCerts, setUserCerts, customGrants, setCustomGrants }) {
+  const [showCustom, setShowCustom] = useState(false);
+
+  const exportJSON = () => {
+    const data = { version:2, exported:new Date().toISOString(), certs:userCerts, customGrants };
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='certpath-portfolio.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const exportCSV = () => {
+    const rows=[['certId','certName','body','tier','expiryDate','ceEarned','ceRequired','examCost','status','daysLeft','notes']];
+    for (const uc of userCerts) {
+      const def=getDef(uc.defId);
+      if (!def) continue;
+      rows.push([uc.defId,def.name,def.body,def.tier,uc.expiryDate||'',uc.ceEarned||0,def.ceRequired,def.examCost,getStatus(uc),getDaysLeft(uc)??'',uc.notes||'']);
+    }
+    const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='certpath-portfolio.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const importJSON = e => {
+    const file=e.target.files[0];
+    if (!file) return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try {
+        const data=JSON.parse(ev.target.result);
+        if (data.certs&&Array.isArray(data.certs)) setUserCerts(data.certs);
+        if (data.customGrants&&Array.isArray(data.customGrants)) setCustomGrants(data.customGrants);
+      } catch { alert('Invalid JSON'); }
+    };
+    reader.readAsText(file);
+    e.target.value='';
+  };
+
+  return (
+    <div>
+      <div className="section-title" style={{marginBottom:12}}>IMPORT / EXPORT</div>
+      <div className="banner banner-warn">No data stored on any server. Everything lives in localStorage. Export regularly.</div>
+
+      <div className="grid2" style={{marginBottom:16}}>
+        <div className="card">
+          <div className="section-title" style={{marginBottom:10}}>EXPORT</div>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            <button className="btn btn-primary w100" onClick={exportJSON}>Export JSON</button>
+            <button className="btn btn-ghost w100" onClick={exportCSV}>Export CSV</button>
+          </div>
+        </div>
+        <div className="card">
+          <div className="section-title" style={{marginBottom:10}}>IMPORT</div>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            <label className="btn btn-ghost w100" style={{cursor:'pointer',justifyContent:'center'}}>
+              Import JSON
+              <input type="file" accept=".json" onChange={importJSON} style={{display:'none'}}/>
+            </label>
+            <button className="btn btn-danger w100" onClick={()=>{if(confirm('Clear all data?')){setUserCerts([]);setCustomGrants([]);}}}>Clear All</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <div className="section-title">CUSTOM CE ACTIVITIES ({customGrants.length})</div>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setShowCustom(true)}>+ Add Custom</button>
+        </div>
+        {customGrants.length===0?(
+          <div style={{fontSize:12,color:'var(--text3)',fontFamily:'var(--mono)'}}>No custom activities. Use this to define employer training or cert-specific activities not in the catalog.</div>
+        ):(
+          customGrants.map((cg,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:12}}>
+              <span className="mono">{cg.name} <span className="dim">— {fmtCost(cg.cost)}</span></span>
+              <button className="btn btn-danger btn-xs" onClick={()=>setCustomGrants(prev=>prev.filter((_,j)=>j!==i))}>Remove</button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="card">
+        <div className="section-title" style={{marginBottom:10}}>KNOWLEDGE BASE</div>
+        <div style={{fontSize:12,color:'var(--text2)',lineHeight:1.7,marginBottom:10}}>
+          {CERT_DB.filter(d=>!d.virtual).length} certs · {[...new Set(CERT_DB.map(d=>d.body))].length} vendors · {CROSS_GRANTS.length} cross-grant policies · {EXAM_SUBS.length} exam substitution rules · {ACTIVITIES.length} catalog activities
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+          {[...new Set(CERT_DB.filter(d=>!d.virtual).map(d=>d.body))].sort().map(b=>(
+            <span key={b} className="tag tag-grey">{b} ({CERT_DB.filter(d=>d.body===b).length})</span>
+          ))}
+        </div>
+      </div>
+
+      {showCustom&&<CustomGrantModal onClose={()=>setShowCustom(false)} onAdd={cg=>setCustomGrants(p=>[...p,cg])}/>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// APP ROOT
+// ─────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState('portfolio');
+  const load = (k,d) => { try { return JSON.parse(localStorage.getItem(k)||'null')??d; } catch { return d; } };
+
+  const [userCerts, setUserCerts] = useState(()=>load('cp-certs',[]));
+  const [targetIds, setTargetIds] = useState(()=>load('cp-targets',[]));
+  const [customGrants, setCustomGrants] = useState(()=>load('cp-custom',[]));
+
+  useEffect(()=>localStorage.setItem('cp-certs',JSON.stringify(userCerts)),[userCerts]);
+  useEffect(()=>localStorage.setItem('cp-targets',JSON.stringify(targetIds)),[targetIds]);
+  useEffect(()=>localStorage.setItem('cp-custom',JSON.stringify(customGrants)),[customGrants]);
+
+  const statuses = userCerts.map(getStatus);
+  const alertCount = statuses.filter(s=>s==='expiring'||s==='expired').length;
+
+  const TABS = [
+    {id:'portfolio', label:'PORTFOLIO'},
+    {id:'timeline',  label:'TIMELINE'},
+    {id:'crossgrants',label:'CROSS-GRANTS'},
+    {id:'roadmap',   label:'ROADMAP'},
+    {id:'optimizer', label:'OPTIMIZER'},
+    {id:'data',      label:'DATA'},
+  ];
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <div className="logo">CERT<em>PATH</em> <span style={{color:'var(--text3)',fontSize:10,fontFamily:'var(--mono)',fontWeight:300}}>v2</span></div>
+        <div className="tabs">
+          {TABS.map(t=>(
+            <button key={t.id} className={`tab ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}>
+              {t.label}
+              {t.id==='optimizer'&&alertCount>0&&(
+                <span style={{marginLeft:5,background:'var(--yellow)',color:'#000',borderRadius:'50%',width:15,height:15,display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,fontFamily:'var(--mono)'}}>
+                  {alertCount}
+                </span>
+              )}
+              {t.id==='roadmap'&&targetIds.length>0&&(
+                <span style={{marginLeft:5,background:'var(--purple)',color:'#000',borderRadius:'50%',width:15,height:15,display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,fontFamily:'var(--mono)'}}>
+                  {targetIds.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="topbar-stat">
+          {userCerts.length} certs
+          {alertCount>0&&<span className="yellow"> · {alertCount} action{alertCount>1?'s':''}</span>}
+          {targetIds.length>0&&<span className="purple"> · {targetIds.length} target{targetIds.length>1?'s':''}</span>}
+        </div>
+      </div>
+      <div className="main">
+        {tab==='portfolio'  &&<PortfolioTab  userCerts={userCerts} setUserCerts={setUserCerts}/>}
+        {tab==='timeline'   &&<TimelineTab   userCerts={userCerts}/>}
+        {tab==='crossgrants'&&<CrossGrantsTab userCerts={userCerts}/>}
+        {tab==='roadmap'    &&<RoadmapTab    userCerts={userCerts} targetIds={targetIds} setTargetIds={setTargetIds}/>}
+        {tab==='optimizer'  &&<OptimizerTab  userCerts={userCerts} targetIds={targetIds} customGrants={customGrants}/>}
+        {tab==='data'       &&<DataTab       userCerts={userCerts} setUserCerts={setUserCerts} customGrants={customGrants} setCustomGrants={setCustomGrants}/>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
