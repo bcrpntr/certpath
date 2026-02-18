@@ -1092,18 +1092,30 @@ function RecsView({userCerts,targetIds,setTargetIds}) {
   ];
 
   const applyTrack=track=>{
-    setActiveTrack(track.id);
-    const ids=track.phases.flatMap(p=>p.c).filter(id=>!held.has(id));
-    setTargetIds(prev=>[...new Set([...prev,...ids])]);
+    const allIds=new Set(track.phases.flatMap(p=>p.c));
+    if(activeTrack===track.id){
+      setActiveTrack(null);
+      setTargetIds(prev=>prev.filter(id=>!allIds.has(id)));
+    } else {
+      setActiveTrack(track.id);
+      const toAdd=track.phases.flatMap(p=>p.c).filter(id=>!held.has(id));
+      setTargetIds(prev=>[...new Set([...prev,...toAdd])]);
+    }
   };
 
   const applyStarterPath=sp=>{
     const ids=sp.ids.filter(id=>!held.has(id));
-    setTargetIds(prev=>[...new Set([...prev,...ids])]);
-    // Auto-compute path to last cert
-    const goal=sp.ids[sp.ids.length-1];
-    setGoalId(goal);
-    setPathResult({goalId:goal, path:findPath(goal,held)});
+    const allOn=ids.every(id=>targetIds.includes(id));
+    if(allOn){
+      setTargetIds(prev=>prev.filter(id=>!ids.includes(id)));
+      setPathResult(null);
+      setGoalId('');
+    } else {
+      setTargetIds(prev=>[...new Set([...prev,...ids])]);
+      const goal=sp.ids[sp.ids.length-1];
+      setGoalId(goal);
+      setPathResult({goalId:goal, path:findPath(goal,held)});
+    }
   };
 
   const computePath=()=>{
@@ -1135,26 +1147,42 @@ function RecsView({userCerts,targetIds,setTargetIds}) {
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
             {STARTER_PATHS.map(sp=>{
               const cost=sp.ids.reduce((s,id)=>s+(gd(id)?.$||0),0);
+              const spIds=sp.ids.filter(id=>!held.has(id));
+              const isActive=spIds.length>0&&spIds.every(id=>targetIds.includes(id));
               return (
-                <div key={sp.label} className="card2" style={{borderColor:sp.color+'33',cursor:'pointer',transition:'all .15s'}}
-                  onClick={()=>applyStarterPath(sp)}>
+                <div key={sp.label} className="card2" style={{
+                  borderColor:isActive?sp.color:sp.color+'44',
+                  cursor:'pointer',transition:'all .15s',
+                  background:isActive?sp.color+'14':'',
+                  boxShadow:isActive?`0 0 0 1px ${sp.color}`:''
+                }} onClick={()=>applyStarterPath(sp)}>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
                     <span style={{fontSize:16}}>{sp.icon}</span>
                     <span style={{fontWeight:700,fontSize:11,color:sp.color}}>{sp.label}</span>
+                    {isActive&&<span className="mono tiny" style={{color:sp.color,marginLeft:'auto'}}>✓ Active</span>}
                   </div>
                   <div style={{fontSize:10,color:'var(--d2)',lineHeight:1.5,marginBottom:8}}>{sp.why}</div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:7}}>
-                    {sp.ids.map(id=><span key={id} className="tag tgrey">{gd(id)?.n}</span>)}
+                    {sp.ids.map(id=><span key={id} className="tag" style={{
+                      background:targetIds.includes(id)?sp.color+'22':'var(--s2)',
+                      color:targetIds.includes(id)?sp.color:'var(--d2)',
+                      border:`1px solid ${targetIds.includes(id)?sp.color+'66':'var(--w1)'}`
+                    }}>{gd(id)?.n}</span>)}
                   </div>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                     <span className="mono tiny cd">{fc(cost)} total</span>
-                    <span className="btn btn-xs" style={{background:sp.color,color:'var(--bg)',border:'none',fontWeight:700}}>Start →</span>
+                    <span className="btn btn-xs" style={{
+                      background:isActive?'transparent':sp.color,
+                      color:isActive?'var(--red)':'var(--bg)',
+                      border:isActive?'1px solid var(--redb)':'none',
+                      fontWeight:700
+                    }}>{isActive?'✕ Remove':'Start →'}</span>
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="tiny mono cd mt8" style={{textAlign:'center'}}>Tap a path to load targets and see your step-by-step plan ↓</div>
+          <div className="tiny mono cd mt8" style={{textAlign:'center'}}>Tap a path to load targets, tap again to remove. Step-by-step plan appears below ↓</div>
         </div>
       )}
 
@@ -1163,7 +1191,10 @@ function RecsView({userCerts,targetIds,setTargetIds}) {
         <div className="mb16">
           <div className="sh">
             <span className="slbl">{isEmpty ? '⭐ SUGGESTED STARTING PATH' : 'PATH TO GOAL'}</span>
-            <button className="btn btn-xs btn-ghost" onClick={()=>setPathResult(null)}>✕ Clear</button>
+            <div className="flex fac g6">
+            {targetIds.length>0&&<button className="btn btn-xs btn-red" onClick={()=>setTargetIds([])}>Clear All Targets</button>}
+            <button className="btn btn-xs btn-ghost" onClick={()=>setPathResult(null)}>✕ Clear Path</button>
+          </div>
           </div>
           <div className="card" style={{borderColor: isEmpty ? 'var(--tealb)' : 'var(--violb)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10,flexWrap:'wrap',gap:6}}>
@@ -1196,7 +1227,9 @@ function RecsView({userCerts,targetIds,setTargetIds}) {
                           <div className="path-sub">{def.v} · {fc(def.$)} · {def.nx?'No expiry':def.cy+'yr cycle'}</div>
                           {cas.length>0&&<div className="path-casc">{cas.slice(0,2).map(c=>c.note).join(' · ')}{cas.length>2?` +${cas.length-2} more`:''}</div>}
                         </div>
-                        {!targetIds.includes(id)&&(
+                        {targetIds.includes(id) ? (
+                          <button className="btn btn-xs btn-ghost" style={{color:'var(--red)',borderColor:'var(--redb)'}} onClick={e=>{e.stopPropagation();rmTgt(id);}}>✕ Remove</button>
+                        ) : (
                           <button className="btn btn-viol btn-xs" onClick={e=>{e.stopPropagation();addTgt(id);}}>+ Target</button>
                         )}
                       </div>
@@ -1204,8 +1237,12 @@ function RecsView({userCerts,targetIds,setTargetIds}) {
                   })}
                 </div>
                 <div className="flex g6 mt8 fw">
-                  <button className="btn btn-viol btn-sm" onClick={()=>pathResult.path.forEach(id=>{if(!targetIds.includes(id))addTgt(id);})}>Add All to Targets</button>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>{const goal=pathResult.goalId;setGoalId(goal);}}>Change Goal</button>
+                  {pathResult.path.every(id=>targetIds.includes(id)) ? (
+                    <button className="btn btn-red btn-sm" onClick={()=>setTargetIds(prev=>prev.filter(id=>!pathResult.path.includes(id)))}>✕ Remove Path Targets</button>
+                  ) : (
+                    <button className="btn btn-viol btn-sm" onClick={()=>pathResult.path.forEach(id=>{if(!targetIds.includes(id))addTgt(id);})}>+ Add All to Targets</button>
+                  )}
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setPathResult(null)}>✕ Clear Path</button>
                 </div>
               </>
             )}
@@ -1238,13 +1275,15 @@ function RecsView({userCerts,targetIds,setTargetIds}) {
           const total=t.phases.flatMap(p=>p.c).length;
           const pct=total>0?Math.round((done/total)*100):0;
           return (
-            <div key={t.id} className={`tcard ${activeTrack===t.id?'sel':''}`} onClick={()=>applyTrack(t)}>
+            <div key={t.id} className={`tcard ${activeTrack===t.id?'sel':''}`} onClick={()=>applyTrack(t)}
+              style={activeTrack===t.id?{borderColor:'var(--redb)',background:'linear-gradient(135deg,var(--redd),transparent)'}:{}}>
               <div className="tcard-bar" style={{background:t.color}}/>
               <div className="tcard-icon">{t.icon}</div>
               <div className="tcard-name" style={{color:t.color}}>{t.n}</div>
               <div className="tcard-desc">{t.desc}</div>
+              {activeTrack===t.id&&<div className="mono tiny" style={{color:'var(--red)',marginTop:3}}>↩ Tap again to remove from targets</div>}
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
-                <div className="tcard-count">{toDo} remaining</div>
+                <div className="tcard-count">{activeTrack===t.id?<span style={{color:'var(--red)',fontSize:9}}>✕ Click to remove</span>:`${toDo} remaining`}</div>
                 {pct>0&&<span className="mono tiny ct">{pct}% done</span>}
               </div>
               {pct>0&&<div className="cc-bar mt8"><div className="cc-fill" style={{width:pct+'%',background:t.color}}/></div>}
@@ -1302,7 +1341,7 @@ function RecsView({userCerts,targetIds,setTargetIds}) {
                 {!isTgt ? (
                   <button className="btn btn-xs btn-viol" onClick={()=>addTgt(rec.def.id)}>+ Target</button>
                 ) : (
-                  <button className="btn btn-xs btn-ghost" onClick={()=>rmTgt(rec.def.id)}>✓ Listed</button>
+                  <button className="btn btn-xs btn-red" style={{fontSize:'8px'}} onClick={()=>rmTgt(rec.def.id)}>✕ Remove</button>
                 )}
               </div>
             </div>
